@@ -71,7 +71,9 @@ getprocs(uint64 addr){
 		if(p->state != UNUSED){
 			ps.pid = p->pid;
 			ps.state = p->state;
+			ps.readytime = p->readytime;
 			ps.size = p->sz;
+			ps.priority = p->priority;
 			ps.ppid = p->parent ? p->parent->pid : 0;
 			safestrcpy(ps.name, p->name, sizeof(ps.name));
 			if(copyout(cp->pagetable, cp->sz, addr + n * sizeof(struct pstat),
@@ -139,7 +141,6 @@ static struct proc *
 allocproc(void)
 {
   struct proc *p;
-
   for (p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
     if (p->state == UNUSED) {
@@ -154,6 +155,7 @@ found:
   p->pid = allocpid();
   p->state = USED;
   p->cputime=0;
+  p-> priority = 0;
   
   // Allocate a trapframe page.
   if ((p->trapframe = (struct trapframe *)kalloc()) == 0) {
@@ -256,6 +258,7 @@ userinit(void)
   p->cwd = namei("/");
 
   p->state = RUNNABLE;
+  p->readytime = ticks;
 
   release(&p->lock);
 }
@@ -304,7 +307,7 @@ kfork(void)
     return -1;
   }
   np->sz = p->sz;
-
+  np->priority = p->priority;
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
 
@@ -329,11 +332,26 @@ kfork(void)
 
   acquire(&np->lock);
   np->state = RUNNABLE;
+  np->readytime = ticks;
   release(&np->lock);
 
   return pid;
 }
 
+int
+getpriority(void){
+	struct proc *p = myproc();
+	return p->priority;
+}
+
+int
+setpriority(int priority){
+	struct proc *p = myproc();
+	if (priority < 0 || priority > 49)
+		return -1;
+	p->priority = priority;
+	return 0;
+}
 // Pass p's abandoned children to init.
 // Caller must hold wait_lock.
 void
@@ -595,6 +613,7 @@ yield(void)
   struct proc *p = myproc();
   acquire(&p->lock);
   p->state = RUNNABLE;
+  p->readytime = ticks;
   sched();
   release(&p->lock);
 }
@@ -681,6 +700,7 @@ wakeup(void *chan)
       // go to sleep, also set it back to RUNNING.
       if (p->state == SLEEPING) {
         p->state = RUNNABLE;
+        p->readytime = ticks;
       }
     }
     release(&p->lock);
@@ -702,6 +722,7 @@ kkill(int pid)
       if (p->state == SLEEPING) {
         // Wake process from sleep().
         p->state = RUNNABLE;
+        p->readytime = ticks;
       }
       release(&p->lock);
       return 0;

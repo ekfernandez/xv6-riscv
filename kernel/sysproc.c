@@ -54,6 +54,18 @@ sys_getprocs(void){
 }
 
 uint64
+sys_getpriority(void){
+	return getpriority();
+}
+
+uint64
+sys_setpriority(void){
+	int priority;
+	argint(0, &priority);
+	return setpriority(priority);
+}
+
+uint64
 sys_sbrk(void)
 {
   uint64 addr;

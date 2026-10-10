@@ -18,11 +18,17 @@ main(int argc, char **argv){
 	nprocs = getprocs(uproc);
 	if (nprocs <0)
 		exit(-1);
-	printf("pid\tstate\t\tsize\tppid\tname\n");
+	int now = uptime();
+	printf("pid\tstate\t\tsize\tppid\tpriority\tname\n");
 	for(i=0; i<nprocs; i++){
 		state = states[uproc[i].state];
-		printf("%d\t%s\t%d\t%d\t%s\n", uproc[i].pid, state,
-			(int)uproc[i].size, uproc[i].ppid, uproc[i].name);
+		printf("%d\t%s\t%d\t%d\t", uproc[i].pid, state,
+			(int)uproc[i].size, uproc[i].ppid);
+		if(uproc[i].state == RUNNABLE)
+			printf("%d\t", now - uproc[i].readytime);
+		else
+			printf("-\t");
+		printf("%d\t%s\n", uproc[i].priority, uproc[i].name);
 	}
 	exit(0);
 }
