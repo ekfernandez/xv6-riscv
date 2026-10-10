@@ -58,6 +58,34 @@ procinit(void)
     p->kstack = KSTACK((int)(p - proc));
   }
 }
+// core logic, walks the process table and for every non-UNUSED process, copies a filled-in struct pstat 
+// out to user space
+int
+getprocs(uint64 addr){
+	struct proc *p;
+	struct proc *cp = myproc();
+	struct pstat ps;
+	int n = 0;
+	for(p = proc; p < &proc[NPROC]; p++){
+		acquire(&p->lock);
+		if(p->state != UNUSED){
+			ps.pid = p->pid;
+			ps.state = p->state;
+			ps.size = p->sz;
+			ps.ppid = p->parent ? p->parent->pid : 0;
+			safestrcpy(ps.name, p->name, sizeof(ps.name));
+			if(copyout(cp->pagetable, cp->sz, addr + n * sizeof(struct pstat),
+				(char *)&ps, sizeof(ps)) < 0){
+				release(&p->lock);
+				return -1;
+			}
+			n++;
+		}
+		release(&p->lock);
+	}
+	return n;
+}
+
 
 // Must be called with interrupts disabled,
 // to prevent race with process being moved
