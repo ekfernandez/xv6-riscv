@@ -352,6 +352,16 @@ setpriority(int priority){
 	p->priority = priority;
 	return 0;
 }
+
+int
+effective_priority(struct proc *p){
+  int age = ticks - p->readytime;
+  int eff = p->priority + age;
+  if (eff > MAXEFFPRIORITY)
+    eff = MAXEFFPRIORITY;
+  return eff;
+}
+
 // Pass p's abandoned children to init.
 // Caller must hold wait_lock.
 void
@@ -559,7 +569,7 @@ scheduler(void)
     for (p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if (p->state == RUNNABLE) {
-        if(best == 0 || p->priority > best -> priority){
+        if(best == 0 || effective_priority(p) > effective_priority(best)){
           if(best != 0)
              release(&best->lock);
           best = p;
