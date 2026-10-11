@@ -135,6 +135,7 @@ UPROGS=\
 	$U/_matmul\
 	$U/_ps\
 	$U/_prioritytest\
+	$U/_pexec\
 	$U/_sleep\
 	$U/_time\
 	$U/_cat\

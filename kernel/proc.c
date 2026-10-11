@@ -552,31 +552,55 @@ scheduler(void)
     intr_off();
 
     int found = 0;
+#if SCHEDULER == SCHED_PRIORITY
+    //priority scheduler: scan all RUNNABLE processes, pick the one with the
+    //highest priority (ties broken by whichever is found first in table order)
+    struct proc *best = 0;
     for (p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if (p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
-
-        // Don't re-enable interrupts on release.
-        mycpu()->intena = 0;
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-        found = 1;
-      }
-      release(&p->lock);
+        if(best == 0 || p->priority > best -> priority){
+          if(best != 0)
+             release(&best->lock);
+          best = p;
+        }else{
+           release(&p->lock);
+        }
+     }else{
+        release(&p->lock);
+     }
+   }
+   //switch to chosen process. it's the process's job to release its lock
+   //and then reacquiring it before jumping back to us
+   if(best!=0){
+     best -> state = RUNNING;
+     c->proc = best;
+     swtch(&c->context, &best->context);
+     mycpu()->intena = 0;
+     c->proc =0;
+     found =1;
+     release(&best->lock);
+   }
+#else
+  //round-robin scheduler (original behavior)
+  for(p=proc; p<&proc[NPROC]; p++){
+    acquire(&p->lock);
+    if(p->state == RUNNABLE){
+      p->state = RUNNING;
+      c->proc = p;
+      swtch(&c->context, &p->context);
+      mycpu()->intena=0;
+      c->proc =0;
+      found =1;
     }
-    if (found == 0) {
-      // nothing to run; stop running on this core until an interrupt.
-      asm volatile("wfi");
-    }
+    release(&p->lock);
   }
+#endif
+  if(found==0){
+    //nothing to run, stop running on this core until an interrupt
+    asm volatile("wfi");
+  }
+}
 }
 
 // Switch to scheduler.  Must hold only p->lock
